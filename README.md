@@ -11,59 +11,67 @@ Head to http://localhost:27272 in your browser to see the list of overlays if yo
 
 ## Example object:
 ```cs
-using System.Threading.Tasks;
+using system;
+using EventTimer = System.Timers.Timer;
+
 
 class ExampleObject
 {
+    public event EventHandler<object> someEvent;
+    public EventTimer someTimer = new EventTimer(5000); // define a timer with a 5 second interval
     object someObject;
 
-    public async Task<object> SomeTask()
+    // Send data when an event is Invoked
+    someEvent += (_,_) =>
     {
-        // You could force a delay of 5 seconds for example by adding
-        // Task.Delay(5000);
-        // OR
-        // Synchronise it with the tablet report using ManualResetEvent
-        return someObject;
+        _ = client.rpc.NotifyAsync("SendDataAsync", "PluginIdentifier", "DataIdentifier", someObject);
+    }
+    // Hook an event to the Elapsed event of the timer and enable it
+    public void SomeInitMethod()
+    {
+        someTimer.Elapsed += (_,_) =>
+        {
+            _ = client.rpc.NotifyAsync("SendDataAsync", "PluginIdentifier", "DataIdentifier", someObject);
+        }
+        someTimer.Start();
     }
 }
 ```
-## Example Server:
+## Example Client (Filter / Interpolator):
 ```cs
 using System.IO.Pipes;
 using System.Threading.Tasks;
 using StreamJsonRpc;
 
-class Server
+namespace Area_Randomizer
 {
-    public string pipename = "SomePipeName";
-    private NamedPipeServerStream server;
-    private JsonRpc rpc;
-    private Object objectToAttach;
-    private bool running = true;
-
-    public Server(Object objectToAttach)
+    public class Client
     {
-        this.objectToAttach = objectToAttach;
-    }
-
-    public async Task Start()
-    {
-        while(running)
+        public string pipename = "API";
+        public NamedPipeClientStream client;
+        public JsonRpc rpc;
+        public Client(string pipename)
         {
-            server = new NamedPipeServerStream(pipename, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-            await server.WaitForConnectionAsync();
-            rpc = JsonRpc.Attach(server, objectToAttach);
-            await rpc.Completion;
-            rpc.Dispose();
-            await server.DisposeAsync();
+            this.pipename = pipename;
         }
-    }
+        public async Task StartAsync()
+        {
+            client = new NamedPipeClientStream(".", pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
+            await client.ConnectAsync();
+            rpc = JsonRpc.Attach(client);
 
-    public void Dispose()
-    {
-        running = false;
-        rpc.Dispose();
-        server.Dispose();
+            rpc.Disconnected += (_, _) =>
+            {
+                client.Dispose();
+                rpc.Dispose();
+                _ = StartAsync();
+            };
+        }
+        public void Dispose()
+        {
+            client.Dispose();
+            rpc.Dispose();
+        }
     }
 }
 ```
@@ -81,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     socket.onopen = function (event) {
         // Initial request, in string form
-        socket.send('{"pipe": "SomePipeName"}');
+        socket.send('{"id": "PluginIdentifier"}');
     };
     socket.onmessage = function (message) {
         // Receive the response in string form
