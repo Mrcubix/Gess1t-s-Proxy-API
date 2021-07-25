@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
+using OpenTabletDriver.Plugin;
 
 namespace Proxy_API
 {
@@ -34,14 +35,14 @@ namespace Proxy_API
                 }
                 catch(Exception E)
                 {
-                    Console.WriteLine(E);
-                    Console.WriteLine("Socket: Listening failed, retrying in 5 seconds...");
+                    Log.Debug("Socket", E.ToString());
+                    Log.Debug("Socket", "Listening failed, retrying in 5 seconds...");
                     await Task.Delay(5000);
 
                     port = GetPort();
                 }
             }
-            Console.WriteLine($"Socket: Now listening on port {port}");
+            Log.Debug("Socket", "Now listening on port {port}");
             _ = Task.Run(async () => 
             {
                 while(true)
@@ -95,7 +96,7 @@ namespace Proxy_API
         }
         public void DisposeConnection(SocketConnection connection)
         {
-            Console.WriteLine($"Socket: A Client has disconnected, disposing...");
+            Log.Debug("Socket", "A Client has disconnected, disposing...");
             connection.CloseConnection();
             connections.Remove(connection);
         }

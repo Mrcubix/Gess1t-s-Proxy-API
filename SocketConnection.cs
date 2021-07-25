@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using OpenTabletDriver.Plugin;
 
 namespace Proxy_API
 {
@@ -66,13 +67,12 @@ namespace Proxy_API
             }
             catch(Exception E)
             {
-                Console.WriteLine(E);
-                Console.WriteLine("Socket: Failed to receive data, closing connection...");
+                Log.Debug("Socket", E.ToString());
+                Log.Debug("Socket", "Failed to receive data, closing connection...");
                 CloseConnection();
                 return;
             }
             string request = BytesToString(requestdata);
-            Console.WriteLine("Websocket upgrade request received");
             Byte[] response = Encoding.UTF8.GetBytes( "HTTP/1.1 101 Switching Protocols" + Environment.NewLine
                                                     + "Connection: Upgrade" + Environment.NewLine
                                                     + "Upgrade: websocket" + Environment.NewLine
@@ -83,8 +83,8 @@ namespace Proxy_API
             }
             catch(Exception E)
             {
-                Console.WriteLine(E);
-                Console.WriteLine("Socket: Failed to send connection upgrade to websocket, closing connection...");
+                Log.Debug("Socket", E.ToString());
+                Log.Debug("Socket", "Failed to send connection upgrade to websocket, closing connection...");
                 CloseConnection();
             }
         }
@@ -97,13 +97,13 @@ namespace Proxy_API
             }
             catch(Exception E)
             {
-                Console.WriteLine(E);
-                Console.WriteLine("Socket: Failed to receive data, closing connection...");
+                Log.Debug("Socket", E.ToString());
+                Log.Debug("Socket", "Failed to receive data, closing connection...");
                 CloseConnection();
                 return;
             }
             string requestString = DecodeEncodedString(requestbytes);
-            Console.WriteLine($"Socket: {requestString}");
+            Log.Debug("Socket", $"{requestString}");
             var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
             if (request.ContainsKey("id"))
             if (!string.IsNullOrWhiteSpace(request["id"]))
@@ -112,7 +112,7 @@ namespace Proxy_API
             }
             else
             {
-                Console.WriteLine("Socket: Incorrect pipename, closing connection...");
+                Log.Debug("Socket", "Incorrect pipename, closing connection...");
                 CloseConnection();
             }
         }
@@ -131,13 +131,13 @@ namespace Proxy_API
                 }
                 catch(Exception E)
                 {
-                    Console.WriteLine(E);
-                    Console.WriteLine("Socket: Failed to receive data, closing connection...");
+                    Log.Debug("Socket", E.ToString());
+                    Log.Debug("Socket", "Failed to receive data, closing connection...");
                     CloseConnection();
                     return;
                 }
                 string requestString = DecodeEncodedString(requestbytes);
-                Console.WriteLine($"Socket: {requestString}");
+                Log.Debug("Socket", $"{requestString}");
                 var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
                 if (request.ContainsKey("method"))
                 if (!string.IsNullOrWhiteSpace(request["method"]))
@@ -146,7 +146,7 @@ namespace Proxy_API
                 }
                 else
                 {
-                    Console.WriteLine("Socket: Incorrect request, closing connection...");
+                    Log.Debug("Socket", "Incorrect request, closing connection...");
                     CloseConnection();
                 }
             }

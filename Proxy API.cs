@@ -16,11 +16,19 @@ namespace Proxy_API
         Server server;
         private string overlayDir = null;
         private bool firstUse = false;
-        static void Main(string[] args)
+        public Proxy_API()
         {
-            Program program = new Program();
-            program.Initialize();
-            resetEvent.WaitOne();
+            overlayDir = Path.Combine(Directory.GetCurrentDirectory(), "Overlays");
+            if (!Directory.Exists(overlayDir))
+            {
+                Directory.CreateDirectory(overlayDir);
+                firstUse = true;
+            }
+            string indexpath = Path.Combine(overlayDir, "index.html");
+            if (!File.Exists(indexpath))
+            {
+                firstUse = true;
+            }
         }
         public bool Initialize()
         {
@@ -29,9 +37,13 @@ namespace Proxy_API
         }
         public async Task InitializeAsync()
         {
-            socketServer = new SocketServer(7272);
+            if (firstUse)
+            {
+                new Thread(new ThreadStart(CopyFiles)).Start();
+            }
+            socketServer = new SocketServer(_SocketPort);
             await socketServer.StartAsync();
-            httpServer = new HTTPServer(27272, 7272);
+            httpServer = new HTTPServer(_HTTPPort, _SocketPort);
             await httpServer.StartAsync();
             server = new Server("API", socketServer);
             await server.StartAsync();

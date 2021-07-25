@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using OpenTabletDriver.Plugin;
 
 namespace Proxy_API
 {
@@ -35,14 +36,14 @@ namespace Proxy_API
                 }
                 catch(Exception E)
                 {
-                    Console.WriteLine(E);
+                    Log.Debug("HTTP Server", E.ToString());
                     Console.WriteLine("HTTP Server: Listening failed, retrying in 5 seconds with another port...");
                     await Task.Delay(5000);
 
                     port = GetPort();
                 }
             }
-            Console.WriteLine($"HTTP Server: Now Running on port {port}");
+            Log.Debug("HTTP Server", $"Now Running on port {port}");
             _ = Task.Run(async () => 
             {
                 while(true)
