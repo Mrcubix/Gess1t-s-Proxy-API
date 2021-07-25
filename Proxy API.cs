@@ -7,7 +7,7 @@ using OpenTabletDriver.Plugin.Attributes;
 
 namespace Proxy_API
 {
-    [PluginName("Proxy API")]
+    [PluginName("Gess1t's Proxy API")]
     public class Proxy_API : ITool
     {
         private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);
