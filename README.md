@@ -80,6 +80,7 @@ namespace Area_Randomizer
 ```js
 document.addEventListener('DOMContentLoaded', async function () {
 
+    // The Socket port is fecthed using an HTTP request
     let request = await fetch("/SocketPort");
     let text = await request.text();
     let port = parseInt(text);
@@ -100,8 +101,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 ```
 
 The following elements must be taken into account when making a plugin for this API:  
-- First, you plugin must contain a public Task called `GetMethods()` that will return a string of the serialized array of method names you want to run periodically.  
-(`return JsonSerializer.Serialize(array);` for example)  
-- Second, Plugins using this tool are required to expose their public Task to StreamJsonRpc by attaching an instance of the Object implmenting them.  
-- Finally, all timing need to be implemented on the plugin side, if you want to add delay between requests for a specific function, you will have to add 
-`await Task.Delay(time);` or use a ManualResetEvent.  
+- First, your Filter / Interpolator need to notify the Tool in some way (see the example), the notification must follow the following syntax:  
+`client.rpc.NotifyAsync("SendDataAsync", Plugin Identifier, Data Identifier, Any Object);`  
+While the Plugin identifier is used to know to which WebSocket connection the data need to be sent, the purpose of the Data Identifier is to easily identifiable once it's received by the overlay's Websocket Client, it can be the position of the cursor for example.
+ (E.G: `Data Identifier = "Position"`)  
+Any type of data can be sent provided that it can be serialized by newtonsoft.
+- Second, your overlay need to send an initial request with the Plugin Identifier (see example).  
+If the identifier is correct then you should be receiving data.
