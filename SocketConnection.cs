@@ -1,53 +1,44 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using OpenTabletDriver.Plugin;
 
 namespace Proxy_API
 {
-    class SocketConnection
+    public class SocketConnection
     {
-        Socket connection;
-        ConnectionHandler connectionHandler;
-        public bool isDisposed = false;
-        public SocketConnection(Socket connection, ConnectionHandler connectionHandler)
+        public Socket connection;
+        private SocketServer socketServer;
+        public string identifier;
+        public SocketConnection(Socket connection, SocketServer socketServer)
         {
             this.connection = connection;
-            this.connectionHandler = connectionHandler;
+            this.socketServer = socketServer;
         }
-        public async Task StartHandlingSocketConnectionAsync()
+        public async Task ProcessClientAsync()
         {
             await UpgradeConnectionAsync();
-            await HandleRequestAsync();
-        }
-        public async Task UpgradeConnectionAsync()
-        {   
-            try
+            _ = Task.Run(async () => 
             {
-            byte[] requestdata = await ReceiveRequestAsync();
-            string request = BytesToString(requestdata);
-            Console.WriteLine("Websocket upgrade request received");
-            Byte[] response = Encoding.UTF8.GetBytes( "HTTP/1.1 101 Switching Protocols" + Environment.NewLine
-                                                    + "Connection: Upgrade" + Environment.NewLine
-                                                    + "Upgrade: websocket" + Environment.NewLine
-                                                    + "Sec-WebSocket-Accept: " + Convert.ToBase64String(
-                                                      SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(new Regex("Sec-WebSocket-Key: (.*)").Match(request).Groups[1].Value.Trim() + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))) + Environment.NewLine+ Environment.NewLine);    
-            connection.Send(response);
-            }
-            catch(Exception E)
-            {
-                Log.Write("Socket", E.ToString(), LogLevel.Error);
-                CloseConnection();
-            }
+                while(true)
+                {
+                    if (!connection.Connected)
+                    {
+                        socketServer.DisposeConnection(this);
+                        break;
+                    }
+                    await Task.Delay(1000);
+                }
+            });
+            await ProcessInitialRequestAsync();
         }
-        public async Task<byte[]> ReceiveRequestAsync()
+        private async Task<byte[]> ReceiveRequestAsync()
         {
             byte[] data = new byte[8192];
             byte[] request = null;
@@ -65,49 +56,104 @@ namespace Proxy_API
             }
             return request;
         }
-        /*
-            TODO:
-                - Add support for parameters
-        */
-        public async Task HandleRequestAsync()
-        {
-            byte[] requestbytes = await ReceiveRequestAsync();
-            string requestString = DecodeEncodedString(requestbytes);
-            Log.Debug("Socket", $"{requestString}");
-            var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
-            string pipename = request["pipe"];
-            if (request.ContainsKey("pipe"))
-            if (!string.IsNullOrWhiteSpace(pipename))
+        private async Task UpgradeConnectionAsync()
+        {   
+            
+            byte[] requestdata;
+            try
             {
-                object responseObjectArray = await connectionHandler.CallRemotePipeMethodAsync(pipename, "GetMethods");
-                string responseText = responseObjectArray.ToString();
-                string[] methods = JsonSerializer.Deserialize<string[]>(responseText);
-                foreach (string method in methods)
-                {
-                    Console.WriteLine($"Socket: calling {method}()");
-                    _ = Task.Run(() => MethodCallingInstanceAsync(pipename, method));
-                }
+                requestdata = await ReceiveRequestAsync();
+            }
+            catch(Exception E)
+            {
+                Console.WriteLine(E);
+                Console.WriteLine("Socket: Failed to receive data, closing connection...");
+                CloseConnection();
+                return;
+            }
+            string request = BytesToString(requestdata);
+            Console.WriteLine("Websocket upgrade request received");
+            Byte[] response = Encoding.UTF8.GetBytes( "HTTP/1.1 101 Switching Protocols" + Environment.NewLine
+                                                    + "Connection: Upgrade" + Environment.NewLine
+                                                    + "Upgrade: websocket" + Environment.NewLine
+                                                    + "Sec-WebSocket-Accept: " + Convert.ToBase64String(SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(new Regex("Sec-WebSocket-Key: (.*)").Match(request).Groups[1].Value.Trim() + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))) + Environment.NewLine+ Environment.NewLine);
+            try
+            {
+                connection.Send(response);
+            }
+            catch(Exception E)
+            {
+                Console.WriteLine(E);
+                Console.WriteLine("Socket: Failed to send connection upgrade to websocket, closing connection...");
+                CloseConnection();
             }
         }
-        public async Task MethodCallingInstanceAsync(string pipename, string method)
+        private async Task ProcessInitialRequestAsync()
         {
-            while (true)
+            byte[] requestbytes;
+            try
             {
-                object result = null;
+                requestbytes = await ReceiveRequestAsync();
+            }
+            catch(Exception E)
+            {
+                Console.WriteLine(E);
+                Console.WriteLine("Socket: Failed to receive data, closing connection...");
+                CloseConnection();
+                return;
+            }
+            string requestString = DecodeEncodedString(requestbytes);
+            Console.WriteLine($"Socket: {requestString}");
+            var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
+            if (request.ContainsKey("id"))
+            if (!string.IsNullOrWhiteSpace(request["id"]))
+            {
+                identifier = request["id"];
+            }
+            else
+            {
+                Console.WriteLine("Socket: Incorrect pipename, closing connection...");
+                CloseConnection();
+            }
+        }
+        /*
+            TODO
+                - Add support for parameters
+        */
+        public async Task HandleFurtherRequestsAsync()
+        {
+            while(true)
+            {
+                byte[] requestbytes;
                 try
                 {
-                    result = await connectionHandler.CallRemotePipeMethodAsync(pipename, method);
-                    byte[] data = EncodeDecodedString("{\""+method+"\":"+result.ToString()+"}");
-                    connection.Send(data);
+                    requestbytes = await ReceiveRequestAsync();
                 }
-                catch(Exception E) 
+                catch(Exception E)
                 {
-                    Console.WriteLine(E.ToString());
-                    Log.Write("Socket", E.ToString(), LogLevel.Error);
+                    Console.WriteLine(E);
+                    Console.WriteLine("Socket: Failed to receive data, closing connection...");
                     CloseConnection();
                     return;
                 }
+                string requestString = DecodeEncodedString(requestbytes);
+                Console.WriteLine($"Socket: {requestString}");
+                var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
+                if (request.ContainsKey("method"))
+                if (!string.IsNullOrWhiteSpace(request["method"]))
+                {
+                    await socketServer.NotifyAsync(identifier, request["method"]);
+                }
+                else
+                {
+                    Console.WriteLine("Socket: Incorrect request, closing connection...");
+                    CloseConnection();
+                }
             }
+        }
+        public void Send(string data)
+        {
+            connection.Send(EncodeDecodedString(data));
         }
         public string DecodeEncodedString(byte[] data)
         {
@@ -179,7 +225,6 @@ namespace Proxy_API
         {
             connection.Disconnect(false);
             connection.Dispose();
-            isDisposed = true;
         }
     }
 }
