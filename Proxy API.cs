@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
 using OpenTabletDriver.Plugin.Attributes;
 
@@ -10,9 +11,9 @@ namespace Proxy_API
     public class Proxy_API : ITool
     {
         private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);
-        ConnectionHandler connectionHandler;
-        HTTPServer httpserver;
-        SocketTool socket;
+        SocketServer socketServer;
+        HTTPServer httpServer;
+        Server server;
         private string overlayDir = null;
         private bool firstUse = false;
         public Proxy_API()
@@ -29,39 +30,31 @@ namespace Proxy_API
                 firstUse = true;
             }
         }
-        public static void Main()
-        {
-            Proxy_API proxy = new Proxy_API();
-            proxy.Initialize();
-            resetEvent.WaitOne();
-        }
         public bool Initialize()
         {
-            new Thread(new ThreadStart(InitializeTool)).Start();
+            _ = Task.Run(InitializeAsync);
             return true;
         }
-        public void InitializeTool()
+        public async Task InitializeAsync()
         {
             if (firstUse)
             {
                 new Thread(new ThreadStart(CopyFiles)).Start();
             }
-            connectionHandler = new ConnectionHandler();
-            _SocketPort = 7272;
-            socket = new SocketTool(connectionHandler, _SocketPort);
-            _ = socket.StartAsync();
-            _HTTPPort = 27272;
-            httpserver = new HTTPServer(connectionHandler, _HTTPPort, _SocketPort);
-            httpserver.Start();
+            socketServer = new SocketServer(_SocketPort);
+            await socketServer.StartAsync();
+            httpServer = new HTTPServer(_HTTPPort, _SocketPort);
+            await httpServer.StartAsync();
+            server = new Server("API", socketServer);
+            await server.StartAsync();
         }
         public void Dispose()
         {
-            connectionHandler.Dispose();
-            connectionHandler = null;
-            httpserver.Stop();
-            httpserver = null;
-            socket.Dispose();
-            socket = null;
+            socketServer.Dispose();
+            socketServer = null;
+            httpServer.Stop();
+            httpServer = null;
+            server = null;
         }
         public void CopyFiles()
         {

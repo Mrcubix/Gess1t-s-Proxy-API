@@ -13,69 +13,59 @@ namespace Proxy_API
 {
     class HTTPServer
     {
-        private ConnectionHandler connectionHandler;
-        public HttpListener server;
-        int port;
-        int socketPort;
+        public int port;
+        public int socketPort;
+        public string[] includedPaths = new string[3] {"/", "/list", "/socketport"};
+        HttpListener listener;
         string path = Path.Combine(Directory.GetCurrentDirectory(),"Overlays");
-        public HTTPServer(ConnectionHandler connectionHandler, int port, int socketPort)
+        public HTTPServer(int port, int socketPort)
         {
-            this.connectionHandler = connectionHandler;
             this.port = port;
             this.socketPort = socketPort;
         }
-        public void Start()
+        public async Task StartAsync()
         {
-            server = new HttpListener();
-            try
-            {
-                server.Prefixes.Add($"http://localhost:{port}/");
-                server.Start();
-                Console.WriteLine($"HTTP Server: Now Running on port {port}");
-                Log.Debug("HTTP Server", $"Now Running on port {port}");
-            }
-            catch(Exception e)
-            {
-                Log.Write("HTTP Server", e.ToString(), LogLevel.Error);
-                Log.Write("HTTP Server", "Port might not be available, choosing a random one...", LogLevel.Error);
-                port = GetPort();
-                Start();
-                return;
-            }
-                _ = Task.Run(WaitForRequestAsync);
-        }
-        public void Stop()
-        {
-            server.Stop();
-            server.Close();
-        }
-        public int GetPort()
-        {
-            TcpListener tcpserver = new TcpListener(IPAddress.Any, 0);
-            tcpserver.Start();
-            int port = ((IPEndPoint)tcpserver.LocalEndpoint).Port;
-            tcpserver.Stop();
-            return port;
-        }
-        public async Task WaitForRequestAsync()
-        {
+            listener = new HttpListener();
             while(true)
             {
-                var context = await server.GetContextAsync();
-                answerHTTPGETRequest(context);
+                listener.Prefixes.Add($"http://localhost:{port}/");
+                try
+                {
+                    listener.Start();
+                    break;
+                }
+                catch(Exception E)
+                {
+                    Log.Debug("HTTP Server", E.ToString());
+                    Console.WriteLine("HTTP Server: Listening failed, retrying in 5 seconds with another port...");
+                    await Task.Delay(5000);
+
+                    port = GetPort();
+                }
             }
+            Log.Debug("HTTP Server", $"Now Running on port {port}");
+            _ = Task.Run(async () => 
+            {
+                while(true)
+                {
+                    var context = await listener.GetContextAsync();
+                    answerHTTPGETRequest(context);
+                }
+            });
         }
         private void answerHTTPGETRequest(HttpListenerContext client) 
         {
             var response = client.Response;
             var request = client.Request;
+
             string relativePath = client.Request.RawUrl;
-            //Log.Write("HTTPServer", $"Current path = {path}, Path requested = {relativePath}");
             string filePath = Path.Combine(path, "." + relativePath);
+
             if (!isFileRequestValid(relativePath, filePath, response))
             {
                 return;
             }
+
             byte[] contents = null;
             switch(relativePath.ToLower())
             {
@@ -111,13 +101,26 @@ namespace Proxy_API
         }
         public bool isFileRequestValid(string relativePath, string filePath, HttpListenerResponse response)
         {
-            if (relativePath != "/" & relativePath.ToLower() != "/list" & relativePath.ToLower() != "/socketport" & !File.Exists(filePath))
+            if (!includedPaths.Contains(relativePath.ToLower()) & !File.Exists(filePath))
             {
                 response.StatusCode = 404;
                 response.Close();
                 return false;
             }
             return true;
+        }
+        public int GetPort()
+        {
+            TcpListener tcpserver = new TcpListener(IPAddress.Any, 0);
+            tcpserver.Start();
+            int port = ((IPEndPoint)tcpserver.LocalEndpoint).Port;
+            tcpserver.Stop();
+            return port;
+        }
+        public void Stop()
+        {
+            listener.Stop();
+            listener.Close();
         }
     }
 }
