@@ -59,7 +59,6 @@ namespace Proxy_API
         }
         private async Task UpgradeConnectionAsync()
         {   
-            
             byte[] requestdata;
             try
             {
