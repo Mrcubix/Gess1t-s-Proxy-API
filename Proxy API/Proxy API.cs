@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
@@ -18,7 +19,18 @@ namespace Proxy_API
         private bool firstUse = false;
         public Proxy_API()
         {
-            overlayDir = Path.Combine(Directory.GetCurrentDirectory(), "Overlays");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                overlayDir = Path.Combine(Directory.GetCurrentDirectory(), "Overlays");
+            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                overlayDir = Path.Combine(Environment.GetEnvironmentVariable("HOME"), ".config/OpenTabletDriver/Overlays");
+            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                overlayDir = Path.Combine(Environment.GetEnvironmentVariable("HOME"), "/Library/Application Support/OpenTabletDriver/Overlays");
+            }
             if (!Directory.Exists(overlayDir))
             {
                 Directory.CreateDirectory(overlayDir);
