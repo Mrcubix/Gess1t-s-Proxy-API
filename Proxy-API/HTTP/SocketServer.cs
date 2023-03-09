@@ -31,6 +31,7 @@ namespace Proxy_API.HTTP
             while(true)
             {
                 endpoint = new IPEndPoint(addr, port);
+
                 try
                 {
                     server.Bind(endpoint);
@@ -46,7 +47,9 @@ namespace Proxy_API.HTTP
                     port = GetPort();
                 }
             }
+
             Log.Debug("Socket", "Now listening on port {port}");
+            
             _ = Task.Run(async () => 
             {
                 while(true)
