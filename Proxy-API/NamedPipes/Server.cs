@@ -26,15 +26,20 @@ namespace Proxy_API.NamedPipes
             while (running)
             {
                 NamedPipeServerStream server = new NamedPipeServerStream(pipename, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                
                 Log.Debug($"{pipename}", "Server Pipe: Waiting for connection...");
                 await server.WaitForConnectionAsync();
+
                 _ = Task.Run(async () => {
                     Log.Debug($"{pipename}", "Server Pipe: Connected");
                     rpc = JsonRpc.Attach(server, socketServer);
+
                     Log.Debug($"{pipename}", "Server Pipe: Listening to request...");
                     await rpc.Completion;
+
                     Log.Debug($"{pipename}", "Server Pipe: Client Disconnected, Disposing and restarting...");
                     rpc.Dispose();
+                    
                     await server.DisposeAsync();
                 });
             }
