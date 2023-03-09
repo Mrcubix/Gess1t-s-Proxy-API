@@ -27,7 +27,7 @@ namespace Proxy_API.Lib.Overlay.Extraction
         public static string overlaySourceDirectory = $"{overlayDirectory}/source";
 
 
-        public static bool TryExtractingEmbeddedResource(string source, string destinationDirectory)
+        public static bool TryExtractingEmbeddedResource(Assembly assembly, string source, string destinationDirectory)
         {
             if (overlayDirectory == "")
             {
@@ -35,17 +35,24 @@ namespace Proxy_API.Lib.Overlay.Extraction
                 return false;
             }
 
-            var assembly = Assembly.GetExecutingAssembly();
-
-            var resourceName = "Location.res.overlays.zip";
-
-            // get the resource stream
-            var resourceStream = assembly.GetManifestResourceStream(source);
+            Stream? resourceStream = null;
+            
+            try
+            {
+                // get the resource stream
+                resourceStream = assembly.GetManifestResourceStream(source);
+            }
+            catch (Exception e)
+            {
+                Log.Write("Location", $"Exception while trying to open a stream to the specified assembly: {e}", LogLevel.Error);
+                return false;
+            }
+            
 
             // if the resource stream is null, we couldn't find the resource
             if (resourceStream == null)
             {
-                Log.Write("Location", $"Could not find resource '{resourceName}'", LogLevel.Error);
+                Log.Write("Location", $"Could not find resource '{source}'", LogLevel.Error);
                 return false;
             }
 
@@ -91,6 +98,6 @@ namespace Proxy_API.Lib.Overlay.Extraction
             return true;
         }
 
-        public static bool AssemblyHasAlreadyBeenExtracted() => File.Exists($"{overlaySourceDirectory}/overlays.zip");
+        public static bool AssemblyHasAlreadyBeenExtracted(string embeddedResourceName) => File.Exists($"{overlaySourceDirectory}/{embeddedResourceName}");
     }
 }

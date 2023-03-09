@@ -6,6 +6,7 @@ using OpenTabletDriver.Plugin.Attributes;
 using Proxy_API.HTTP;
 using Proxy_API.NamedPipes;
 using Proxy_API.Lib.Overlay.Extraction;
+using System.Reflection;
 
 namespace Proxy_API
 {
@@ -18,6 +19,8 @@ namespace Proxy_API
         HTTPServer httpServer = null!;
         Server server = null!;
 
+        string zipEmbeddedResource = $"Proxy_API.res.overlays.zip";
+
 #region Initialization
 
         public bool Initialize()
@@ -28,6 +31,7 @@ namespace Proxy_API
 
         public async Task InitializeAsync()
         {
+            Log.Debug("Location", $"Extracting overlays if neccessary...");
 
             // check if overlays have been extracted, if not, extract them
             if (!ExtractOverlays())
@@ -35,6 +39,12 @@ namespace Proxy_API
                 Log.Write("Location", $"Overlays could not be extracted", LogLevel.Error);
                 return;
             }
+            else
+            {
+                Log.Write("Location", $"Overlays extracted successfully", LogLevel.Info);
+            }
+
+            Log.Debug("Location", $"Starting servers...");
 
             socketServer = new SocketServer(_SocketPort);
             await socketServer.StartAsync();
@@ -57,13 +67,21 @@ namespace Proxy_API
 
         public bool ExtractOverlays()
         {
-            if (OverlayExtractor.AssemblyHasAlreadyBeenExtracted())
+            if (OverlayExtractor.AssemblyHasAlreadyBeenExtracted(zipEmbeddedResource))
             {
                 Log.Write("Location", $"Overlays are missing, extracting now...", LogLevel.Info);
                 return true;
             }
 
-            return OverlayExtractor.TryExtractingEmbeddedResource("Location.res.overlays.zip", OverlayExtractor.overlayDirectory);
+            try
+            {
+                return OverlayExtractor.TryExtractingEmbeddedResource(Assembly.GetExecutingAssembly(), zipEmbeddedResource, OverlayExtractor.overlayDirectory);
+            }
+            catch (Exception e)
+            {
+                Log.Write("Location", $"Exception while trying to extract overlays: {e}", LogLevel.Error);
+                return false;
+            }
         }
 
 #endregion
