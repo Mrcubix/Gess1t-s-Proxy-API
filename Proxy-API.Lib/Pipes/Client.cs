@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
 using StreamJsonRpc;
 
-namespace Proxy_API.Pipes.Lib
+namespace Proxy_API.Lib.Pipes
 {
     /// <summary>
     /// Represents a client that connects to a named pipe server.
     /// </summary>
-    class Client
+    public class Client
     {
         public string pipename;
         private JsonRpc rpc = null!;
