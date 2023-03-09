@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
 using OpenTabletDriver.Plugin.Attributes;
 using Proxy_API.HTTP;
+using Proxy_API.HTTP.Websocket;
 using Proxy_API.NamedPipes;
 using Proxy_API.Lib.Overlay.Extraction;
 using System.Reflection;
@@ -46,10 +47,10 @@ namespace Proxy_API
 
             Log.Debug("Location", $"Starting servers...");
 
-            socketServer = new SocketServer(_SocketPort);
+            socketServer = new SocketServer(_socketPort, Retries);
             await socketServer.StartAsync();
 
-            httpServer = new HTTPServer(_HTTPPort, _SocketPort);
+            httpServer = new HTTPServer(_HTTPPort, _socketPort);
             await httpServer.StartAsync();
 
             server = new Server("API", socketServer);
@@ -112,13 +113,29 @@ namespace Proxy_API
         ]
         public int SocketPort 
         {
-            get => _SocketPort;
+            get => _socketPort;
             set
             {
-                _SocketPort = Math.Min(value, 65535);
+                _socketPort = Math.Min(value, 65535);
             }
         }
-        private int _SocketPort;
+        private int _socketPort;
+
+        [Property("Plugin Connections Retries"),
+         Unit("Retries"),
+         DefaultPropertyValue(3),
+         ToolTip("Proxy API:\n\n" +
+                 "The number of times a client will attempt to connect to a specified plugin before failing.")
+        ]
+        public int Retries 
+        {
+            get => _retries;
+            set
+            {
+                _retries = Math.Min(value, 10);
+            }
+        }
+        private int _retries;
     }
 
 #endregion

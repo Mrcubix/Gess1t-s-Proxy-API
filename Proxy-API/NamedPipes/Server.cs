@@ -1,7 +1,7 @@
 using System.IO.Pipes;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
-using Proxy_API.HTTP;
+using Proxy_API.HTTP.Websocket;
 using StreamJsonRpc;
 
 namespace Proxy_API.NamedPipes

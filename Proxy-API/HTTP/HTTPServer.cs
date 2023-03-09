@@ -91,7 +91,6 @@ namespace Proxy_API.HTTP
                     break;
                 default:
                     contents = File.ReadAllBytes(filePath);
-
                     break;
             }
 

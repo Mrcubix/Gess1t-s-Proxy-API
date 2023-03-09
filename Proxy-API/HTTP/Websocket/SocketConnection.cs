@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,7 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
 
-namespace Proxy_API.HTTP
+namespace Proxy_API.HTTP.Websocket
 {
     public class SocketConnection
     {
@@ -29,7 +28,7 @@ namespace Proxy_API.HTTP
         public async Task ProcessClientAsync()
         {
             await UpgradeConnectionAsync();
-            
+
             _ = Task.Run(async () =>
             {
                 while (true)
@@ -83,13 +82,13 @@ namespace Proxy_API.HTTP
                 CloseConnection();
                 return;
             }
-            string request = BytesToString(requestdata);
+            string request = Encoding.UTF8.GetString(requestdata);
 
             Byte[] response = Encoding.UTF8.GetBytes("HTTP/1.1 101 Switching Protocols" + Environment.NewLine
-                                                    + "Connection: Upgrade" + Environment.NewLine
-                                                    + "Upgrade: websocket" + Environment.NewLine
-                                                    + "Sec-WebSocket-Accept: " + Convert.ToBase64String(SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(new Regex("Sec-WebSocket-Key: (.*)").Match(request).Groups[1].Value.Trim() + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))) + Environment.NewLine + Environment.NewLine);
-            
+                                                   + "Connection: Upgrade" + Environment.NewLine
+                                                   + "Upgrade: websocket" + Environment.NewLine
+                                                   + "Sec-WebSocket-Accept: " + Convert.ToBase64String(SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(new Regex("Sec-WebSocket-Key: (.*)").Match(request).Groups[1].Value.Trim() + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))) + Environment.NewLine + Environment.NewLine);
+
             try
             {
                 connection.Send(response);
@@ -98,17 +97,23 @@ namespace Proxy_API.HTTP
             {
                 Log.Debug("Socket", E.ToString());
                 Log.Debug("Socket", "Failed to send connection upgrade to websocket, closing connection...");
-                
+
                 CloseConnection();
             }
         }
 
+        /// <summary>
+        ///   Process the initial request from the client.<br/>
+        ///   The first request of a connection should contain the identifier of the plugin pipe <br/>
+        ///   it's trying to get data from.
+        /// </summary>
         private async Task ProcessInitialRequestAsync()
         {
             byte[] requestbytes;
 
             try
             {
+                // receive initial request
                 requestbytes = await ReceiveRequestAsync();
             }
             catch (Exception E)
@@ -119,7 +124,7 @@ namespace Proxy_API.HTTP
                 return;
             }
 
-            string requestString = DecodeEncodedString(requestbytes);
+            string requestString = WebSocketEncoding.DecodeEncodedString(requestbytes, this);
             Log.Debug("Socket", $"{requestString}");
 
             var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
@@ -131,6 +136,7 @@ namespace Proxy_API.HTTP
                 return;
             }
 
+            // check if request contains an identifier, which is the name of the plugin pipe
             if (request.ContainsKey("id"))
             {
                 if (!string.IsNullOrWhiteSpace(request["id"]))
@@ -145,10 +151,10 @@ namespace Proxy_API.HTTP
             }
         }
 
-        /*
-            TODO
-                - Add support for parameters
-        */
+        /// <summary>
+        ///   Handle further requests from the client.
+        ///   Request should contain the method name and optional parameters.
+        /// </summary>
         public async Task HandleFurtherRequestsAsync()
         {
             while (true)
@@ -168,7 +174,7 @@ namespace Proxy_API.HTTP
                     return;
                 }
 
-                string requestString = DecodeEncodedString(requestbytes);
+                string requestString = WebSocketEncoding.DecodeEncodedString(requestbytes, this);
                 Log.Debug("Socket", $"{requestString}");
 
                 var request = JsonSerializer.Deserialize<Dictionary<string, string>>(requestString);
@@ -178,96 +184,29 @@ namespace Proxy_API.HTTP
 
                 if (request.ContainsKey("method"))
                 {
-                    if (!string.IsNullOrWhiteSpace(request["method"]))
+                    var method = request["method"];
+
+                    if (string.IsNullOrWhiteSpace(request["method"]))
                     {
-                        await socketServer.NotifyAsync(identifier, request["method"]);
+                        return;
                     }
+
+                    string[]? parameters = null;
+
+                    if (request.ContainsKey("parameters"))
+                    {
+                        var serializedParameters = request["parameters"];
+                        parameters = JsonSerializer.Deserialize<string[]>(serializedParameters);
+                    }
+
+                    _ = socketServer.NotifyAsync(identifier, request["method"], parameters);
                 }
             }
         }
 
         public void Send(string data)
         {
-            connection.Send(EncodeDecodedString(data));
-        }
-
-        public string DecodeEncodedString(byte[] data)
-        {
-            if (data[0] == 129)
-            {
-                if (data[1] > 127)
-                {
-                    int length = data[1] - 128;
-                    int offset = 2;
-
-                    if (length == 126)
-                    {
-                        length = BitConverter.ToUInt16(data[2..4]);
-                        offset = 4;
-                    }
-
-                    if (length == 127)
-                    {
-                        length = BitConverter.ToUInt16(data[2..10]);
-                        offset = 10;
-                    }
-
-                    // YEP first copy pasta for the decoding part https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_server#decoding_algorithm adapted to use slices like previously
-                    byte[] decodedData = new byte[length];
-                    byte[] mask = data[offset..(offset + 4)];
-                    offset += 4;
-
-                    for (int i = 0; i < length; ++i)
-                    {
-                        decodedData[i] = (byte)(data[offset + i] ^ mask[i % 4]);
-                    }
-
-                    return BytesToString(decodedData);
-                }
-                else
-                {
-                    CloseConnection();
-                    return null!;
-                }
-            }
-            else
-            {
-                return null!;
-            }
-        }
-
-        public byte[] EncodeDecodedString(string response)
-        {
-            List<byte> data = new List<byte>();
-            data.Add(129);
-
-            if (response.Length < 126)
-            {
-                data.Add((byte)(response.Length));
-            }
-
-            if (response.Length > 125 & response.Length < 65536)
-            {
-                data.Add(126);
-                ushort midlength = Convert.ToUInt16(response.Length);
-                data.AddRange(BitConverter.GetBytes(midlength).Reverse());
-            }
-
-            if (response.Length > 65535)
-            {
-                data.Add(127);
-                ulong longlength = Convert.ToUInt64(response.Length);
-                data.AddRange(BitConverter.GetBytes(longlength).Reverse());
-            }
-
-            data.AddRange(Encoding.UTF8.GetBytes(response));
-
-            return data.ToArray();
-        }
-
-        public string BytesToString(byte[] data)
-        {
-            return Encoding.UTF8.GetString(data);
+            connection.Send(WebSocketEncoding.EncodeDecodedString(data));
         }
 
         public void CloseConnection()
