@@ -91,8 +91,10 @@ namespace Proxy_API.HTTP
                     break;
                 default:
                     contents = File.ReadAllBytes(filePath);
+
                     break;
             }
+
             response.ContentType = request.ContentType;
             response.ContentEncoding = Encoding.UTF8;
             response.ContentLength64 = contents.LongLength;
@@ -104,7 +106,7 @@ namespace Proxy_API.HTTP
             IEnumerable<string> overlaysEnumerable = from folder in new DirectoryInfo(path).GetDirectories()
                                                      select folder.Name;
             List<string> overlays = overlaysEnumerable.ToList();
-            overlays.RemoveAll(x => x == "js" | x == "css" | x == "img");
+            overlays.RemoveAll(x => x == "js" | x == "css" | x == "img" | x == "source");
             Dictionary<string, List<string>> overlaysJSON = new Dictionary<string, List<string>>();
             overlaysJSON.Add("data", overlays);
             string serializedOverlays = JsonSerializer.Serialize(overlaysJSON);

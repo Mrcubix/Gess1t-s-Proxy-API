@@ -48,7 +48,7 @@ namespace Proxy_API.HTTP
                 }
             }
 
-            Log.Debug("Socket", "Now listening on port {port}");
+            Log.Debug("Socket", $"Now listening on port {port}");
             
             _ = Task.Run(async () => 
             {
