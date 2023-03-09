@@ -10,48 +10,48 @@ namespace Proxy_API.Lib.Pipes
     /// </summary>
     public class Client
     {
-        public string pipename;
-        private JsonRpc rpc = null!;
-        public NamedPipeClientStream client = null!;
-        public bool isconnected = false;
+        public string Pipename { get; set; }
+        public JsonRpc Rpc { get; set; }= null!;
+        private NamedPipeClientStream client = null!;
+        public bool IsConnected { get; set; }= false;
 
 
         public Client(string pipename)
         {
-            this.pipename = pipename;
+            this.Pipename = pipename;
         }
 
 
         public async Task StartConnectionAsync()
         {
-            client = new NamedPipeClientStream(".", pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
+            client = new NamedPipeClientStream(".", Pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
             
             Log.Debug("Proxy API Client", "Connecting...");
             await client.ConnectAsync();
 
-            isconnected = true;
+            IsConnected = true;
             Log.Debug("Proxy API Client", "Connected.");
 
-            rpc = JsonRpc.Attach(client);
-            rpc.Disconnected += (_, _) =>
+            Rpc = JsonRpc.Attach(client);
+            Rpc.Disconnected += (_, _) =>
             {
-                isconnected = false;
+                IsConnected = false;
                 client.Dispose();
-                rpc.Dispose();
+                Rpc.Dispose();
             };
             
-            Log.Debug("Proxy API Client", $"Client (tool) now listen to {pipename}");
+            Log.Debug("Proxy API Client", $"Client (tool) now listen to {Pipename}");
         }
 
         public async Task<object> CallRemoteMethodAsync(string methodname)
         {
-            return await rpc.InvokeAsync<object>(methodname);
+            return await Rpc.InvokeAsync<object>(methodname);
         }
         
         public void Dispose()
         {
             client.Dispose();
-            rpc.Dispose();
+            Rpc.Dispose();
         }
     }
 }
