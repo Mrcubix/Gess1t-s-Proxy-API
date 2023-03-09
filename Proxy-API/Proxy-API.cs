@@ -18,8 +18,6 @@ namespace Proxy_API
         HTTPServer httpServer = null!;
         Server server = null!;
 
-        private bool firstUse = false;
-
 #region Initialization
 
         public bool Initialize()
