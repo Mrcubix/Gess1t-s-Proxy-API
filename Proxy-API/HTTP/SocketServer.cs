@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text.Json;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
+using Proxy_API.NamedPipes;
 
-namespace Proxy_API
+namespace Proxy_API.HTTP
 {
     public class SocketServer
     {
@@ -15,12 +15,16 @@ namespace Proxy_API
         List<PluginConnection> pluginConnections = new List<PluginConnection>();
         List<SocketConnection> connections = new List<SocketConnection>();
         static IPAddress addr = IPAddress.Parse("127.0.0.1");
-        IPEndPoint endpoint;
-        Socket server;
+        IPEndPoint endpoint = null!;
+        Socket server = null!;
+
+
         public SocketServer(int port)
         {
             this.port = port;
         }
+
+
         public async Task StartAsync()
         {
             server = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -53,6 +57,7 @@ namespace Proxy_API
                 }
             });
         }
+
         public async Task SendDataAsync(string identifier, string dataIdentifier, object data)
         {
             IEnumerable<SocketConnection> ConnectionsEnumerable = from connection in connections
@@ -60,10 +65,11 @@ namespace Proxy_API
                                                                   select connection;
             foreach (SocketConnection connection in ConnectionsEnumerable)
             {
-                string responseString = data.ToString();
+                string? responseString = data.ToString();
                 await Task.Run(() => connection.Send("{\""+ dataIdentifier + "\":" + responseString + "}"));     
             }
         }
+
         /*
             TODO:
                 - Add support for parameters
@@ -73,9 +79,11 @@ namespace Proxy_API
             PluginConnection pluginConnection = await GetPluginConnectionAsync(pipename);
             await pluginConnection.rpc.NotifyAsync(method);
         }
+
         public async Task<PluginConnection> GetPluginConnectionAsync(string pipename)
         {
-            PluginConnection pluginConnection = pluginConnections.Find(x => x.pipename == pipename);
+            PluginConnection? pluginConnection = pluginConnections.FirstOrDefault(x => x.pipename == pipename);
+
             if (pluginConnection == null)
             {
                 pluginConnection = new PluginConnection(pipename);
@@ -86,6 +94,7 @@ namespace Proxy_API
             }
             return pluginConnection;
         }
+
         public int GetPort()
         {
             TcpListener tcpserver = new TcpListener(IPAddress.Any, 0);
@@ -94,12 +103,14 @@ namespace Proxy_API
             tcpserver.Stop();
             return port;
         }
+
         public void DisposeConnection(SocketConnection connection)
         {
             Log.Debug("Socket", "A Client has disconnected, disposing...");
             connection.CloseConnection();
             connections.Remove(connection);
         }
+
         public void Dispose()
         {
             for (int i = 0; i != connections.Count; i++)

@@ -3,17 +3,19 @@ using System.IO.Pipes;
 using System.Threading.Tasks;
 using StreamJsonRpc;
 
-namespace Proxy_API
+namespace Proxy_API.NamedPipes
 {
     public class PluginConnection
     {
         public string pipename;
-        public NamedPipeClientStream client;
-        public JsonRpc rpc;
+        public NamedPipeClientStream client = null!;
+        public JsonRpc rpc = null!;
+
         public PluginConnection(string pipename)
         {
             this.pipename = pipename;
         }
+        
         public async Task StartAsync()
         {
             client = new NamedPipeClientStream(".", pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
