@@ -1,22 +1,26 @@
-using System;
 using System.IO.Pipes;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
+using Proxy_API.HTTP.Websocket;
 using StreamJsonRpc;
 
-namespace Proxy_API
+namespace Proxy_API.NamedPipes
 {
     public class Server
     {
         public string pipename;
         public SocketServer socketServer;
-        private JsonRpc rpc;
+        private JsonRpc rpc = null!;
         private bool running = true;
+
+
         public Server(string pipename, SocketServer socketServer) 
         {
             this.pipename = pipename;
             this.socketServer = socketServer;
         }
+
+        
         public async Task StartAsync()
         {
             while (running)

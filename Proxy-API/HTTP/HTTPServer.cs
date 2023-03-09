@@ -9,20 +9,22 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using OpenTabletDriver.Plugin;
 
-namespace Proxy_API
+namespace Proxy_API.HTTP
 {
     class HTTPServer
     {
         public int port;
         public int socketPort;
         public string[] includedPaths = new string[3] {"/", "/list", "/socketport"};
-        HttpListener listener;
+        HttpListener listener = null!;
         string path = Path.Combine(Directory.GetCurrentDirectory(),"Overlays");
+
         public HTTPServer(int port, int socketPort)
         {
             this.port = port;
             this.socketPort = socketPort;
         }
+
         public async Task StartAsync()
         {
             listener = new HttpListener();
@@ -53,20 +55,28 @@ namespace Proxy_API
                 }
             });
         }
+
         private void answerHTTPGETRequest(HttpListenerContext client) 
         {
             var response = client.Response;
             var request = client.Request;
 
-            string relativePath = client.Request.RawUrl;
+            string? relativePath = client.Request.RawUrl;
             string filePath = Path.Combine(path, "." + relativePath);
+
+            if (relativePath == null)
+            {
+                response.StatusCode = 404;
+                response.Close();
+                return;
+            }
 
             if (!isFileRequestValid(relativePath, filePath, response))
             {
                 return;
             }
 
-            byte[] contents = null;
+            byte[] contents = null!;
             switch(relativePath.ToLower())
             {
                 case "/":
@@ -83,22 +93,25 @@ namespace Proxy_API
                     contents = File.ReadAllBytes(filePath);
                     break;
             }
+
             response.ContentType = request.ContentType;
             response.ContentEncoding = Encoding.UTF8;
             response.ContentLength64 = contents.LongLength;
             response.Close(contents, true);
         }
+
         public byte[] OverlayListResponse(HttpListenerResponse response)
         {
             IEnumerable<string> overlaysEnumerable = from folder in new DirectoryInfo(path).GetDirectories()
                                                      select folder.Name;
             List<string> overlays = overlaysEnumerable.ToList();
-            overlays.RemoveAll(x => x == "js" | x == "css" | x == "img");
+            overlays.RemoveAll(x => x == "js" | x == "css" | x == "img" | x == "source");
             Dictionary<string, List<string>> overlaysJSON = new Dictionary<string, List<string>>();
             overlaysJSON.Add("data", overlays);
             string serializedOverlays = JsonSerializer.Serialize(overlaysJSON);
             return Encoding.UTF8.GetBytes(serializedOverlays);
         }
+
         public bool isFileRequestValid(string relativePath, string filePath, HttpListenerResponse response)
         {
             if (!includedPaths.Contains(relativePath.ToLower()) & !File.Exists(filePath))
@@ -109,6 +122,7 @@ namespace Proxy_API
             }
             return true;
         }
+
         public int GetPort()
         {
             TcpListener tcpserver = new TcpListener(IPAddress.Any, 0);
@@ -117,6 +131,7 @@ namespace Proxy_API
             tcpserver.Stop();
             return port;
         }
+
         public void Stop()
         {
             listener.Stop();

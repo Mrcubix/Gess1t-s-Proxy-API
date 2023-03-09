@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <RootNamespace>Proxy_API</RootNamespace>
+    <Nullable>enable</Nullable>
+    <NoWarn>NETSDK1138</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTabletDriver.Plugin" Version="0.5.2" />
+    <PackageReference Include="StreamJsonRpc" Version="2.8.21" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Proxy-API.Lib\Proxy-API.Lib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="res\overlays.zip" />
+  </ItemGroup>
+
+</Project>
