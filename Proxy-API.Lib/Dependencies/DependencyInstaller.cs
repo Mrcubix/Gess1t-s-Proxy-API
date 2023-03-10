@@ -44,6 +44,7 @@ namespace Proxy_API.Lib.Dependencies
                 
                 Log.Write($"{group} Installer", spacer, LogLevel.Info);
                 Log.Write($"{group} Installer", $"Installed {installed} of {entriesCount} dependencies.", LogLevel.Info);
+                Log.Write($"{group} Installer", $"You may need to restart OpenTabletDriver before the plugin can be enabled.", LogLevel.Info);
                 Log.Write($"{group} Installer", spacer, LogLevel.Info);
             }
 
