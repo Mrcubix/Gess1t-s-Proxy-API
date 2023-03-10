@@ -5,9 +5,9 @@ using OpenTabletDriver.Plugin;
 
 namespace Proxy_API.Lib.Dependencies
 {
-    public class DependenciesInstaller
+    public class DependencyInstaller
     {
-        public static bool InstallDepedencies(string group, string resourcePath, string destinationDirectory, bool forceInstall = false)
+        public static bool Install(string group, string resourcePath, string destinationDirectory, bool forceInstall = false)
         {
             Assembly assembly = Assembly.GetExecutingAssembly();
 
