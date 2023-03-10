@@ -32,16 +32,16 @@ namespace Proxy_API
 
         public async Task InitializeAsync()
         {
-            Log.Debug("Location", $"Extracting overlays if neccessary...");
+            Log.Debug("API", $"Extracting overlays if neccessary...");
 
             // check if overlays have been extracted, if not, extract them
             if (!ExtractOverlays())
             {
-                Log.Write("Location", $"Overlays could not be extracted", LogLevel.Error);
+                Log.Write("API", $"Overlays could not be extracted", LogLevel.Error);
                 return;
             }
 
-            Log.Debug("Location", $"Starting servers...");
+            Log.Debug("API", $"Starting servers...");
 
             socketServer = new SocketServer(_socketPort, Retries);
             await socketServer.StartAsync();
@@ -66,7 +66,7 @@ namespace Proxy_API
         {
             if (OverlayExtractor.AssemblyHasAlreadyBeenExtracted(zipEmbeddedResource))
             {
-                Log.Write("Location", $"Overlays have already been extracted", LogLevel.Info);
+                Log.Write("API", $"Overlays have already been extracted", LogLevel.Info);
                 return true;
             }
 
@@ -76,7 +76,7 @@ namespace Proxy_API
             }
             catch (Exception e)
             {
-                Log.Write("Location", $"Exception while trying to extract overlays: {e}", LogLevel.Error);
+                Log.Write("API", $"Exception while trying to extract overlays: {e}", LogLevel.Error);
                 return false;
             }
         }
