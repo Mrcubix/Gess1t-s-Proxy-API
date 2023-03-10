@@ -38,7 +38,14 @@ namespace Proxy_API.Lib.Dependencies
             }
 
             if (installed > 0)
+            {
+                string successMessage = $"Successfully installed {installed} of {entriesCount} dependencies.";
+                string spacer = new string('-', successMessage.Length);
+                
+                Log.Write($"{group} Installer", spacer, LogLevel.Info);
                 Log.Write($"{group} Installer", $"Installed {installed} of {entriesCount} dependencies.", LogLevel.Info);
+                Log.Write($"{group} Installer", spacer, LogLevel.Info);
+            }
 
             return true;
         }
