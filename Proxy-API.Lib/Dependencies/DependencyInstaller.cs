@@ -7,10 +7,8 @@ namespace Proxy_API.Lib.Dependencies
 {
     public class DependencyInstaller
     {
-        public static bool Install(string group, string resourcePath, string destinationDirectory, bool forceInstall = false)
+        public static bool Install(Assembly assembly, string group,  string resourcePath, string destinationDirectory, bool forceInstall = false)
         {
-            Assembly assembly = Assembly.GetExecutingAssembly();
-
             var dependencies = assembly.GetManifestResourceStream(resourcePath);
 
             if (dependencies == null)
