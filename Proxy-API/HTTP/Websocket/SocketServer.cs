@@ -77,10 +77,6 @@ namespace Proxy_API.HTTP.Websocket
             }
         }
 
-        /*
-            TODO:
-                - Add support for parameters
-        */
         public async Task NotifyAsync(string pipename, string method, string[]? parameters)
         {
             PluginConnection? pluginConnection = await GetPluginConnectionAsync(pipename);

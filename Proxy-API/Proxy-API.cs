@@ -40,10 +40,6 @@ namespace Proxy_API
                 Log.Write("Location", $"Overlays could not be extracted", LogLevel.Error);
                 return;
             }
-            else
-            {
-                Log.Write("Location", $"Overlays extracted successfully", LogLevel.Info);
-            }
 
             Log.Debug("Location", $"Starting servers...");
 
@@ -70,7 +66,7 @@ namespace Proxy_API
         {
             if (OverlayExtractor.AssemblyHasAlreadyBeenExtracted(zipEmbeddedResource))
             {
-                Log.Write("Location", $"Overlays are missing, extracting now...", LogLevel.Info);
+                Log.Write("Location", $"Overlays have already been extracted", LogLevel.Info);
                 return true;
             }
 

@@ -65,6 +65,8 @@ namespace Proxy_API.Lib.Overlay.Extraction
             if (!Directory.Exists(destinationDirectory))
                 Directory.CreateDirectory(destinationDirectory);
 
+            Log.Debug("Location", $"Extracting {source} to {destinationDirectory}");
+
             // pass the stream to a zip file reader
             using (var zip = new ZipArchive(memoryStream, ZipArchiveMode.Read))
             {
@@ -88,6 +90,8 @@ namespace Proxy_API.Lib.Overlay.Extraction
 
             if (!Directory.Exists(overlaySourceDirectory))
                 Directory.CreateDirectory(overlaySourceDirectory);
+
+            Log.Debug("Location", $"Extracting {source} to {overlaySourceDirectory} (source directory)");
 
             // finally, write the zip file to disk
             using (var fileStream = new FileStream($"{overlaySourceDirectory}/{source}", FileMode.Create))
