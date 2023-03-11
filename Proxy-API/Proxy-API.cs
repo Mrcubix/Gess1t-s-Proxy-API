@@ -16,11 +16,11 @@ namespace Proxy_API
     {
         private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);
 
-        SocketServer socketServer = null!;
-        HTTPServer httpServer = null!;
-        Server server = null!;
+        private SocketServer socketServer = null!;
+        private HTTPServer httpServer = null!;
+        private Server server = null!;
 
-        string zipEmbeddedResource = $"Proxy_API.res.overlays.zip";
+        private string zipEmbeddedResource = $"Proxy_API.res.overlays.zip";
 
 #region Initialization
 
@@ -43,11 +43,29 @@ namespace Proxy_API
 
             Log.Debug("API", $"Starting servers...");
 
-            socketServer = new SocketServer(_socketPort, Retries);
-            await socketServer.StartAsync();
+            try
+            {
+                socketServer = new SocketServer(_socketPort, Retries);
+                socketServer.Start();
+            }
+            catch (Exception e)
+            {
+                Log.Debug("Socket", e.ToString());
+                Log.Debug("Socket", "Listening failed, maybe the port is already in use?");
+                return;
+            }
 
-            httpServer = new HTTPServer(_HTTPPort, _socketPort);
-            await httpServer.StartAsync();
+            try
+            {
+                httpServer = new HTTPServer(_HTTPPort, _socketPort);
+                httpServer.Start();
+            }
+            catch(Exception e)
+            {
+                Log.Debug("HTTP Server", e.ToString());
+                Log.Debug("HTTP Server", "Listening failed, maybe the port is already in use?");
+                return;
+            }
 
             server = new Server("API", socketServer);
             await server.StartAsync();
@@ -57,8 +75,10 @@ namespace Proxy_API
         {
             socketServer.Dispose();
             socketServer = null!;
+
             httpServer.Stop();
             httpServer = null!;
+
             server = null!;
         }
 
@@ -72,7 +92,7 @@ namespace Proxy_API
 
             try
             {
-                return OverlayExtractor.TryExtractingEmbeddedResource(Assembly.GetExecutingAssembly(), zipEmbeddedResource, OverlayExtractor.overlayDirectory);
+                return OverlayExtractor.TryExtractingEmbeddedResource(Assembly.GetExecutingAssembly(), zipEmbeddedResource, OverlayExtractor.OverlayDirectory);
             }
             catch (Exception e)
             {

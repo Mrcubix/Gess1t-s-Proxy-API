@@ -13,15 +13,17 @@ namespace Proxy_API.HTTP.Websocket
 {
     public class SocketConnection
     {
-        public Socket connection;
-        private SocketServer socketServer;
-        public string identifier = null!;
+        private SocketServer server;
 
+        public int Id { get; set; }
+        public string Pipename { get; set; } = null!;
+        public Socket Client { get; set; }
 
-        public SocketConnection(Socket connection, SocketServer socketServer)
+        public SocketConnection(int id, Socket client, SocketServer server)
         {
-            this.connection = connection;
-            this.socketServer = socketServer;
+            this.Id = id;
+            this.Client = client;
+            this.server = server;
         }
 
 
@@ -29,20 +31,21 @@ namespace Proxy_API.HTTP.Websocket
         {
             await UpgradeConnectionAsync();
 
-            _ = Task.Run(async () =>
-            {
-                while (true)
-                {
-                    if (!connection.Connected)
-                    {
-                        socketServer.DisposeConnection(this);
-                        break;
-                    }
-                    await Task.Delay(1000);
-                }
-            });
+            _ = MonitorConnectionAsync();
 
             await ProcessInitialRequestAsync();
+        }
+
+        private async Task MonitorConnectionAsync()
+        {
+            while (Client.Connected)
+            {
+                await Task.Delay(1000);
+            }
+
+            Log.Debug("Socket", $"Connection {Id} has been closed.");
+
+            server.DisposeConnection(this);
         }
 
         private async Task<byte[]> ReceiveRequestAsync()
@@ -55,7 +58,7 @@ namespace Proxy_API.HTTP.Websocket
                 int byteCount;
                 do
                 {
-                    byteCount = connection.Receive(data);
+                    byteCount = Client.Receive(data);
                     await ms.WriteAsync(data, 0, byteCount);
                 }
                 while (byteCount == 8192);
@@ -79,9 +82,10 @@ namespace Proxy_API.HTTP.Websocket
                 Log.Debug("Socket", E.ToString());
                 Log.Debug("Socket", "Failed to receive data, closing connection...");
 
-                CloseConnection();
+                server.DisposeConnection(this);
                 return;
             }
+
             string request = Encoding.UTF8.GetString(requestdata);
 
             Byte[] response = Encoding.UTF8.GetBytes("HTTP/1.1 101 Switching Protocols" + Environment.NewLine
@@ -91,14 +95,14 @@ namespace Proxy_API.HTTP.Websocket
 
             try
             {
-                connection.Send(response);
+                Client.Send(response);
             }
             catch (Exception E)
             {
                 Log.Debug("Socket", E.ToString());
                 Log.Debug("Socket", "Failed to send connection upgrade to websocket, closing connection...");
 
-                CloseConnection();
+                server.DisposeConnection(this);
             }
         }
 
@@ -120,7 +124,7 @@ namespace Proxy_API.HTTP.Websocket
             {
                 Log.Debug("Socket", E.ToString());
                 Log.Debug("Socket", "Failed to receive data, closing connection...");
-                CloseConnection();
+                server.DisposeConnection(this);
                 return;
             }
 
@@ -132,7 +136,7 @@ namespace Proxy_API.HTTP.Websocket
             if (request == null)
             {
                 Log.Debug("Socket", "Failed to deserialize request, closing connection...");
-                CloseConnection();
+                server.DisposeConnection(this);
                 return;
             }
 
@@ -141,12 +145,12 @@ namespace Proxy_API.HTTP.Websocket
             {
                 if (!string.IsNullOrWhiteSpace(request["id"]))
                 {
-                    identifier = request["id"];
+                    Pipename = request["id"];
                 }
                 else
                 {
                     Log.Debug("Socket", "Incorrect pipename, closing connection...");
-                    CloseConnection();
+                    server.DisposeConnection(this);
                 }
             }
         }
@@ -170,7 +174,7 @@ namespace Proxy_API.HTTP.Websocket
                     Log.Debug("Socket", E.ToString());
                     Log.Debug("Socket", "Failed to receive data, closing connection...");
 
-                    CloseConnection();
+                    server.DisposeConnection(this);
                     return;
                 }
 
@@ -199,20 +203,20 @@ namespace Proxy_API.HTTP.Websocket
                         parameters = JsonSerializer.Deserialize<string[]>(serializedParameters);
                     }
 
-                    _ = socketServer.NotifyAsync(identifier, request["method"], parameters);
+                    _ = server.InvokeAsync(Pipename, request["method"], parameters);
                 }
             }
         }
 
         public void Send(string data)
         {
-            connection.Send(WebSocketEncoding.EncodeDecodedString(data));
+            Client.Send(WebSocketEncoding.EncodeDecodedString(data));
         }
 
         public void CloseConnection()
         {
-            connection.Disconnect(false);
-            connection.Dispose();
+            Client.Disconnect(false);
+            Client.Dispose();
         }
     }
 }

@@ -12,14 +12,15 @@ namespace Proxy_API.HTTP.Websocket
 {
     public class SocketServer
     {
-        private int maxRetries = 0;
-        public int port { get; set; }
-
         private List<PluginConnection> pluginConnections = new List<PluginConnection>();
         private List<SocketConnection> connections = new List<SocketConnection>();
         private static IPAddress addr = IPAddress.Parse("127.0.0.1");
         private IPEndPoint endpoint = null!;
         private Socket server = null!;
+        private int maxRetries = 0;
+
+        public int port { get; set; }
+        public bool Disposed = false;
 
 
         public SocketServer(int port, int retries)
@@ -28,56 +29,61 @@ namespace Proxy_API.HTTP.Websocket
             this.maxRetries = retries;
         }
 
+#region Initialization
 
-        public async Task StartAsync()
+        public void Start()
         {
             server = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            while (true)
-            {
-                endpoint = new IPEndPoint(addr, port);
 
-                try
-                {
-                    server.Bind(endpoint);
-                    server.Listen();
-                    break;
-                }
-                catch (Exception E)
-                {
-                    Log.Debug("Socket", E.ToString());
-                    Log.Debug("Socket", "Listening failed, retrying in 5 seconds...");
-                    await Task.Delay(5000);
-
-                    port = GetPort();
-                }
-            }
+            StartListening();
 
             Log.Debug("Socket", $"Now listening on port {port}");
 
-            _ = Task.Run(async () =>
-            {
-                while (true)
-                {
-                    Socket client = await server.AcceptAsync();
-                    connections.Add(new SocketConnection(client, this));
-                    _ = Task.Run(() => connections[connections.Count - 1].ProcessClientAsync());
-                }
-            });
+            _ = WaitForConnectionAsync();
         }
 
-        public async Task SendDataAsync(string identifier, string dataIdentifier, object data)
+        private void StartListening()
         {
-            IEnumerable<SocketConnection> ConnectionsEnumerable = from connection in connections
-                                                                  where connection.identifier == identifier
-                                                                  select connection;
-            foreach (SocketConnection connection in ConnectionsEnumerable)
+            endpoint = new IPEndPoint(addr, port);
+
+            // Attempt at binding to a specified port
+            server.Bind(endpoint);
+            // Start listening for incoming connections
+            server.Listen();
+        }
+
+        private async Task WaitForConnectionAsync()
+        {
+            while (!Disposed)
             {
-                string? responseString = data.ToString();
-                await Task.Run(() => connection.Send("{\"" + dataIdentifier + "\":" + responseString + "}"));
+                // Accept an incoming connection
+                Socket client = await server.AcceptAsync();
+
+                Log.Debug("Socket", "A Client has connected, starting a new thread...");
+
+                connections.Add(new SocketConnection(connections.Count, client, this));
+                _ = Task.Run(() => connections.Last().ProcessClientAsync());
             }
         }
 
-        public async Task NotifyAsync(string pipename, string method, string[]? parameters)
+#endregion
+
+#region Data Exchange
+
+        public async Task SendDataAsync(string pipename, string dataIdentifier, object data)
+        {
+            IEnumerable<SocketConnection> ConnectionsEnumerable = from connection in connections
+                                                                  where connection.Pipename == pipename
+                                                                  select connection;
+
+            foreach (SocketConnection connection in ConnectionsEnumerable)
+            {
+                string? serializeData = data.ToString();
+                await Task.Run(() => connection.Send("{\"" + dataIdentifier + "\":" + serializeData + "}"));
+            }
+        }
+
+        public async Task InvokeAsync(string pipename, string method, string[]? parameters)
         {
             PluginConnection? pluginConnection = await GetPluginConnectionAsync(pipename);
 
@@ -87,18 +93,20 @@ namespace Proxy_API.HTTP.Websocket
                 return;
             }
 
-            await pluginConnection.rpc.NotifyAsync(method, parameters);
+            await pluginConnection.InvokeAsync(method, parameters);
         }
+
+#endregion
 
         public async Task<PluginConnection?> GetPluginConnectionAsync(string pipename, int retries = 0)
         {
-            PluginConnection? pluginConnection = pluginConnections.FirstOrDefault(x => x.pipename == pipename);
+            PluginConnection? pluginConnection = pluginConnections.FirstOrDefault(x => x.Pipename == pipename);
 
+            // if the plugin connection does not exist, create it
             if (pluginConnection == null)
-            {
                 pluginConnection = new PluginConnection(pipename);
-            }
-            if (!pluginConnection.client.IsConnected)
+
+            if (!pluginConnection.IsConnected)
             {
                 try
                 {
@@ -106,13 +114,15 @@ namespace Proxy_API.HTTP.Websocket
                     cts.CancelAfter(20000);
 
                     await pluginConnection.StartAsync();
+
+                    cts.Dispose();
                 }
                 catch (OperationCanceledException)
                 {
                     if (retries >= maxRetries)
                     {
                         Log.Debug("Socket", "Failed to connect to plugin, max retries reached.");
-                        return pluginConnection;
+                        return null;
                     }
                     else
                     {
@@ -126,36 +136,38 @@ namespace Proxy_API.HTTP.Websocket
             return pluginConnection;
         }
 
-        public int GetPort()
-        {
-            TcpListener tcpserver = new TcpListener(IPAddress.Any, 0);
-            tcpserver.Start();
-            int port = ((IPEndPoint)tcpserver.LocalEndpoint).Port;
-            tcpserver.Stop();
-            return port;
-        }
+#region Disposing
 
         public void DisposeConnection(SocketConnection connection)
         {
             Log.Debug("Socket", "A Client has disconnected, disposing...");
             connection.CloseConnection();
-            connections.Remove(connection);
+            // I don't really trust Remove and however it compare elements to find the right one
+            connections.RemoveAt(connection.Id);
+        }
+
+        public void DisposeConnection(PluginConnection connection)
+        {
+            Log.Debug("Socket", "A Plugin has disconnected, disposing...");
+            connection.Dispose();
+            pluginConnections.Remove(connection);
         }
 
         public void Dispose()
         {
-            for (int i = 0; i != connections.Count; i++)
-            {
-                connections[i].CloseConnection();
-                connections.RemoveAt(i);
-            }
-            for (int i = 0; i != pluginConnections.Count; i++)
-            {
-                pluginConnections[i].Dispose();
-                pluginConnections.RemoveAt(i);
-            }
+            foreach (SocketConnection connection in connections)
+                DisposeConnection(connection);
+
+            foreach (PluginConnection connection in pluginConnections)
+                DisposeConnection(connection);
+
             server.Disconnect(false);
+
             server.Dispose();
+            Disposed = true;
         }
     }
+
+#endregion
+
 }

@@ -17,19 +17,19 @@ namespace Proxy_API.Lib.Overlay.Extraction
         private static string pluginLocation = Assembly.GetExecutingAssembly().Location;
         private static string currentDirectory = Directory.GetCurrentDirectory();
 
-        public static string overlayDirectory = SystemInterop.CurrentPlatform switch
+        public static string OverlayDirectory = SystemInterop.CurrentPlatform switch
         {
             PluginPlatform.Windows => $"{currentDirectory}/overlays",
             PluginPlatform.Linux => $"{homeDirectory}/.config/OpenTabletDriver/overlays",
             PluginPlatform.MacOS => $"{homeDirectory}/Library/Application Support/OpenTabletDriver/overlays",
             _ => ""
         };
-        public static string overlaySourceDirectory = $"{overlayDirectory}/source";
+        public static string overlaySourceDirectory = $"{OverlayDirectory}/source";
 
 
         public static bool TryExtractingEmbeddedResource(Assembly assembly, string source, string destinationDirectory)
         {
-            if (overlayDirectory == "")
+            if (OverlayDirectory == "")
             {
                 Log.Write("Location", $"Your platform is unsupported", LogLevel.Error);
                 return false;

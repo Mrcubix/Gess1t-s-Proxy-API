@@ -1,41 +1,51 @@
 using System;
 using System.IO.Pipes;
 using System.Threading.Tasks;
+using OpenTabletDriver.Plugin;
 using StreamJsonRpc;
 
 namespace Proxy_API.NamedPipes
 {
     public class PluginConnection
     {
-        public string pipename;
-        public NamedPipeClientStream client = null!;
+        private NamedPipeClientStream client = null!;
+
+        public string Pipename { get; set; }
+        public bool IsConnected => client != null && client.IsConnected;
         public JsonRpc rpc = null!;
 
         public PluginConnection(string pipename)
         {
-            this.pipename = pipename;
+            this.Pipename = pipename;
         }
         
         public async Task StartAsync()
         {
-            client = new NamedPipeClientStream(".", pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
-            await client.ConnectAsync();
-            Console.WriteLine($"API: Connected = {client.IsConnected}");
-            rpc = JsonRpc.Attach(client);
+            client = new NamedPipeClientStream(".", Pipename, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough | PipeOptions.CurrentUserOnly);
 
+            await client.ConnectAsync();
+            Log.Debug("API", $"Connected to {Pipename}");
+
+            rpc = JsonRpc.Attach(client);
             rpc.Disconnected += (_, _) =>
             {
-                Console.WriteLine($"API: Connected = {client.IsConnected}");
+                Log.Debug("API", $"Disconnected from {Pipename}");
                 client.Dispose();
                 rpc.Dispose();
             };
 
-            Console.WriteLine($"API: Now listening to {pipename}");
+            Log.Debug("API:", $"Now listening to {Pipename}");
         }
+
         public void Dispose()
         {
             client.Dispose();
             rpc.Dispose();
+        }
+
+        public async Task InvokeAsync(string method, params object?[]? args)
+        {
+            await rpc.InvokeAsync(method, args);
         }
     }
 }
